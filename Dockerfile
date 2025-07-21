@@ -14,7 +14,9 @@
 # limitations under the License.
 
 # Use NVIDIA PyTorch container as base image
-FROM nvcr.io/nvidia/pytorch:24.10-py3
+FROM nvcr.io/nvidia/pytorch:24.10-py3 as base
+
+ARG conda_terms_of_service=ask
 
 # Install basic tools
 RUN apt-get update && apt-get install -y git tree ffmpeg wget
@@ -23,6 +25,7 @@ RUN rm /bin/sh && ln -s /bin/bash /bin/sh && ln -s /lib64/libcuda.so.1 /lib64/li
 # Copy the cosmos-predict1.yaml and requirements.txt files to the container
 COPY ./cosmos-predict1.yaml /cosmos-predict1.yaml
 COPY ./requirements.txt /requirements.txt
+COPY ./scripts/conda_installer.sh /conda_installer.sh
 
 # Install cosmos-predict1 dependencies. This will take a while.
 RUN echo "Installing dependencies. This will take a while..." && \
@@ -30,18 +33,15 @@ RUN echo "Installing dependencies. This will take a while..." && \
     wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda3/miniconda.sh && \
     bash ~/miniconda3/miniconda.sh -b -u -p ~/miniconda3 && \
     rm ~/miniconda3/miniconda.sh && \
-    source ~/miniconda3/bin/activate && \
-    conda env create --file /cosmos-predict1.yaml && \
-    conda activate cosmos-predict1 && \
-    pip install --no-cache-dir -r /requirements.txt && \
-    ln -sf $CONDA_PREFIX/lib/python3.10/site-packages/nvidia/*/include/* $CONDA_PREFIX/include/ && \
-    ln -sf $CONDA_PREFIX/lib/python3.10/site-packages/nvidia/*/include/* $CONDA_PREFIX/include/python3.10 && \
-    ln -sf $CONDA_PREFIX/lib/python3.10/site-packages/triton/backends/nvidia/include/* $CONDA_PREFIX/include/ && \
-    pip install transformer-engine[pytorch]==1.12.0 && \
-    git clone https://github.com/NVIDIA/apex && cd apex && \
-    CUDA_HOME=$CONDA_PREFIX pip install -v --disable-pip-version-check --no-cache-dir --no-build-isolation --config-settings "--build-option=--cpp_ext" --config-settings "--build-option=--cuda_ext" . && \
-    echo "Environment setup complete"
+    source ~/miniconda3/bin/activate
 
+RUN echo "=============================================================================================================="
+RUN echo "Container build starting with conda_terms_of_service=${conda_terms_of_service}"
+RUN echo "=============================================================================================================="
+RUN source /conda_installer.sh
+RUN echo "=============================================================================================================="
+RUN echo "Container build complete with conda_terms_of_service=${conda_terms_of_service}"
+RUN echo "=============================================================================================================="
 
 # Default command
 CMD ["/bin/bash"]
